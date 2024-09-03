@@ -49,7 +49,7 @@ async def send(ctx: discord.Interaction):
     embeds: list[discord.Embed] = []
     for i, message in enumerate(messages[ctx.user.id]):
         if i == 0:
-            embeds.append(discord.Embed(title=f'{getenv('EMOJI') or ""} *Forwarded*', description=message.content, timestamp=message.created_at))
+            embeds.append(discord.Embed(title=f'{getenv("EMOJI") or ""} *Forwarded*', description=message.content, timestamp=message.created_at))
         else:
             embeds.append(discord.Embed(description=message.content, timestamp=message.created_at))
         embeds[i].set_author(name=message.author.name, icon_url=message.author.display_avatar.url)
