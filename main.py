@@ -41,6 +41,7 @@ async def forward(interaction: discord.Interaction, message: discord.Message):
     await interaction.followup.send('You have already saved a message. Would you like to add it to the list?\n-# NOTE: You can save up to 10 messages.', view=view)
 
 @tree.command(description='Send the saved message(s) to another channel')
+@app_commands.describe(show_original='Whether to show the original message link. Might be needed to set to off on servers with strict automod.')
 @app_commands.user_install()
 async def send(ctx: discord.Interaction, show_original: bool=True):
     if ctx.user.id not in messages:
