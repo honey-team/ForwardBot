@@ -42,14 +42,14 @@ async def forward(interaction: discord.Interaction, message: discord.Message):
 
 @tree.command(description='Send the saved message(s) to another channel')
 @app_commands.user_install()
-async def send(ctx: discord.Interaction):
+async def send(ctx: discord.Interaction, show_original: bool=True):
     if ctx.user.id not in messages:
         await ctx.response.send_message('You have not saved any messages to send. Use context menu option `Forward`', ephemeral=True)
         return
     embeds: list[discord.Embed] = []
     for i, message in enumerate(messages[ctx.user.id]):
         if i == 0:
-            embeds.append(discord.Embed(title=f'{getenv('EMOJI') or ""} *Forwarded*', description=message.content, timestamp=message.created_at))
+            embeds.append(discord.Embed(title=f'{getenv("EMOJI") or ""} *Forwarded*', description=message.content, timestamp=message.created_at))
         else:
             embeds.append(discord.Embed(description=message.content, timestamp=message.created_at))
         embeds[i].set_author(name=message.author.name, icon_url=message.author.display_avatar.url)
@@ -59,7 +59,8 @@ async def send(ctx: discord.Interaction):
         for a in message.attachments:
             if a != image:
                 embeds[i].add_field(name=a.filename, value=f'[Link to attachment]({a.url})')
-        embeds[i].add_field(name='Original Message', value=f'[Link to message]({message.jump_url})', inline=False)
+        if show_original:
+            embeds[i].add_field(name='Original Message', value=f'[Link to message]({message.jump_url})', inline=False)
         embeds[i].set_footer(text=f'Forwarded by {ctx.user.name}', icon_url=ctx.user.display_avatar.url)
     await ctx.response.send_message(embeds=embeds)
     del messages[ctx.user.id]
