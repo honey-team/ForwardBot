@@ -61,7 +61,7 @@ async def send(ctx: discord.Interaction, show_original: bool=True, anonymous: bo
             if a != image:
                 embeds[i].add_field(name=a.filename, value=f'[Link to attachment]({a.url})')
         if show_original:
-            embeds[i].add_field(name='Original Message', value=f'[Link to message]({message.jump_url})', inline=False)
+            embeds[i].add_field(name='Original Message', value=f'[Go to message]({message.jump_url})', inline=False)
         if not anonymous:
             embeds[i].set_footer(text=f'Forwarded by {ctx.user.name}', icon_url=ctx.user.display_avatar.url)
     if anonymous:
