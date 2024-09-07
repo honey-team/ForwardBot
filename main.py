@@ -96,9 +96,12 @@ async def send(ctx: discord.Interaction, show_original: bool=True, anonymous: bo
     embeds: list[discord.Embed] = []
     for i, message in enumerate(messages[ctx.user.id]):
         if i == 0:
-            embeds.append(discord.Embed(title=f'{getenv("EMOJI") or ""} *Forwarded by {ctx.user.name if not anonymous else ""}*' if ctx.locale is not discord.Locale.russian else f'{getenv("EMOJI") or ""} *Переслано {ctx.user.name if not anonymous else ""}*', description=f'**{message.author.mention} | <t:{int(message.created_at.timestamp())}:t>**\n' + message.content))
+            if ctx.locale is discord.Locale.russian:
+                embeds.append(discord.Embed(title=f'{getenv("EMOJI") or ""} *Переслано {ctx.user.name}*' if not anonymous else f'{getenv("EMOJI") or ""} *Переслано*', description=message.content))
+            else:
+                embeds.append(discord.Embed(title=f'{getenv("EMOJI") or ""} *Forwarded by {ctx.user.name}*' if not anonymous else f'{getenv("EMOJI") or ""} *Forwarded*', description=message.content))
         else:
-            embeds.append(discord.Embed(description=f'**{message.author.mention} | <t:{int(message.created_at.timestamp())}:t>**\n' + message.content))
+            embeds.append(discord.Embed(description=message.content))
         image = discord.utils.find(lambda a: a.content_type.startswith('image'), message.attachments)
         if image is not None:
             embeds[i].set_image(url=image.url)
@@ -106,7 +109,7 @@ async def send(ctx: discord.Interaction, show_original: bool=True, anonymous: bo
             if a != image:
                 embeds[i].add_field(name='', value=f'[{a.filename}]({a.url})')
         if show_original:
-            embeds[i].add_field(name='', value=f'[Go to message]({message.jump_url})' if ctx.locale is not discord.Locale.russian else f'[Перейти к сообщению]({message.jump_url})', inline=False)
+            embeds[i].add_field(name='', value=f'-# [{message.author.name}・<t:{int(message.created_at.timestamp())}:t>]({message.jump_url})' if ctx.locale is not discord.Locale.russian else f'[Перейти к сообщению]({message.jump_url})', inline=False)
     if anonymous:
         await ctx.response.send_message(':shushing_face:', ephemeral=True)
         await ctx.followup.send(embeds=embeds)
