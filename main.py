@@ -109,7 +109,7 @@ async def send(ctx: discord.Interaction, show_original: bool=True, anonymous: bo
             if a != image:
                 embeds[i].add_field(name='', value=f'[{a.filename}]({a.url})')
         if show_original:
-            embeds[i].add_field(name='', value=f'-# [{message.author.name}・<t:{int(message.created_at.timestamp())}:t>]({message.jump_url})' if ctx.locale is not discord.Locale.russian else f'[Перейти к сообщению]({message.jump_url})', inline=False)
+            embeds[i].add_field(name='', value=f'-# [{message.author.name}・<t:{int(message.created_at.timestamp())}:t>]({message.jump_url})', inline=False)
     if anonymous:
         await ctx.response.send_message(':shushing_face:', ephemeral=True)
         await ctx.followup.send(embeds=embeds)
