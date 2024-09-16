@@ -2,8 +2,6 @@ import discord
 from discord import app_commands
 from dotenv import load_dotenv
 from os import getenv
-import aiohttp
-from bs4 import BeautifulSoup
 from utils import *
 load_dotenv()
 
