@@ -31,11 +31,11 @@ async def create_send_embeds(ctx: discord.Interaction, messages: list[discord.Me
     embeds: list[discord.Embed] = []
     for i, message in enumerate(messages):
         tenor = message.embeds and message.embeds[0].url.startswith('https://tenor.com/view/') # kill tenor
+        image = discord.utils.find(lambda a: a.content_type in image_types, message.attachments)
         if i == 0:
-            embeds.append(discord.Embed(title=f'{getenv("EMOJI") or ""} *Forwarded*', description=message.content if not (message.embeds and message.content == message.embeds[0].url) else None))
+            embeds.append(discord.Embed(title=f'{getenv("EMOJI") or ""} *Forwarded*', description=message.content if not (message.embeds and message.content == message.embeds[0].url and image is None) else None))
         else:
             embeds.append(discord.Embed(description=message.content))
-        image = discord.utils.find(lambda a: a.content_type in image_types, message.attachments)
         if image is None:
             if tenor:
                 async with aiohttp.ClientSession(headers={'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'}) as session:
