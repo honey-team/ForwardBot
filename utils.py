@@ -33,7 +33,7 @@ async def create_send_embeds(ctx: discord.Interaction, messages: list[discord.Me
         tenor = message.embeds and message.embeds[0].url.startswith('https://tenor.com/view/') # kill tenor
         image = discord.utils.find(lambda a: a.content_type in image_types, message.attachments)
         if i == 0:
-            embeds.append(discord.Embed(title=f'{getenv("EMOJI") or ""} *Forwarded*', description=message.content if not (message.embeds and message.content == message.embeds[0].url and image is None) else None))
+            embeds.append(discord.Embed(title=f'{getenv("EMOJI") or ""} *Forwarded*' if not ctx.locale is discord.Locale.russian else f'{getenv("EMOJI") or ""} *Переслано*', description=message.content if not (message.embeds and message.content == message.embeds[0].url and image is None) else None))
         else:
             embeds.append(discord.Embed(description=message.content))
         if image is None:
