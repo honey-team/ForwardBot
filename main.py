@@ -11,8 +11,13 @@ messages: dict[int, list[discord.Message]] = {}
 
 @bot.event
 async def on_ready():
+    global SEND, DELETE
     await tree.set_translator(MyTranslator())
-    await tree.sync()
+    for command in await tree.sync():
+        if command.name == 'send':
+            SEND = f'</send:{command.id}>'
+        elif command.name == 'delete':
+            DELETE = f'</delete:{command.id}>'
 
 @tree.context_menu(name=app_commands.locale_str('Forward'))
 @app_commands.user_install()
@@ -21,9 +26,9 @@ async def forward(interaction: discord.Interaction, message: discord.Message):
     if interaction.user.id not in messages:
         messages[interaction.user.id] = [message]
         if interaction.locale is discord.Locale.russian:
-            await interaction.followup.send('Сообщение сохранено. Теперь используйте команду `/отправить`, чтобы отправить его в другой канал.')
+            await interaction.followup.send(f'Сообщение сохранено. Теперь используйте команду {SEND}, чтобы отправить его в другой канал.')
         else:
-            await interaction.followup.send('Message saved. Now, use the `/send` command to send it to another channel.')
+            await interaction.followup.send(f'Message saved. Now, use the {SEND} command to send it to another channel.')
         return
     class AskButton(discord.ui.Button):
         async def callback(self, ctx: discord.Interaction):
@@ -31,20 +36,20 @@ async def forward(interaction: discord.Interaction, message: discord.Message):
                 if len(messages[ctx.user.id]) < 10:
                     messages[ctx.user.id].append(message)
                     if ctx.locale is discord.Locale.russian:
-                        await ctx.response.edit_message(content='Сообщение добавлено в список. Теперь используйте команду `/отправить`, чтобы отправить все сообщения в другой канал.',view=None)
+                        await ctx.response.edit_message(content=f'Сообщение добавлено в список. Теперь используйте команду {SEND}, чтобы отправить все сообщения в другой канал.',view=None)
                     else:
-                        await ctx.response.edit_message(content='Message added to the list. Now, use the `/send` command to send all messages to another channel.',view=None)
+                        await ctx.response.edit_message(content=f'Message added to the list. Now, use the {SEND} command to send all messages to another channel.',view=None)
                 else:
                     if ctx.locale is discord.Locale.russian:
-                        await ctx.response.send_message(content='Вы достигли максимального лимита в 10 сообщений. Пожалуйста, отправьте сохраненные сообщения с помощью команды `/отправить` или перезапишите их.')
+                        await ctx.response.send_message(content=f'Вы достигли максимального лимита в 10 сообщений. Пожалуйста, отправьте сохраненные сообщения с помощью команды {SEND} или удалите их с помощью команды {DELETE}.')
                     else:
-                        await ctx.response.send_message(content='You have reached the maximum limit of 10 messages. Please send the messages you have saved using the `/send` command or overwrite them.')
+                        await ctx.response.send_message(content=f'You have reached the maximum limit of 10 messages. Please send the messages you have saved using the {SEND} command or delete them using the {DELETE} command.')
                 return
             messages[ctx.user.id] = [message]
             if ctx.locale is discord.Locale.russian:
-                await ctx.response.edit_message(content='Сообщение сохранено. Теперь используйте команду `/отправить`, чтобы отправить его в другой канал.', view=None)
+                await ctx.response.edit_message(content=f'Сообщение сохранено. Теперь используйте команду {SEND}, чтобы отправить его в другой канал.', view=None)
             else:
-                await ctx.response.edit_message(content='Message saved. Now, use the `/send` command to send it to another channel.', view=None)
+                await ctx.response.edit_message(content=f'Message saved. Now, use the {SEND} command to send it to another channel.', view=None)
     view = discord.ui.View()
     if interaction.locale is discord.Locale.russian:
         view.add_item(AskButton(label='Да', custom_id='yes', style=discord.ButtonStyle.green))
