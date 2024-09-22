@@ -80,4 +80,44 @@ async def send(ctx: discord.Interaction, show_original: bool=True, anonymous: bo
     await ctx.followup.send(**await create_send_embeds(ctx, messages[ctx.user.id], show_original, anonymous))
     del messages[ctx.user.id]
 
+@tree.command(name=app_commands.locale_str('preview'), description=app_commands.locale_str('Preview the saved message(s)'))
+@app_commands.user_install()
+async def preview(ctx: discord.Interaction):
+    if ctx.user.id not in messages:
+        if ctx.locale is discord.Locale.russian:
+            await ctx.response.send_message('Вы не сохранили никаких сообщений для перессылки. Используйте контекстное меню `Переслать`', ephemeral=True)
+        else:
+            await ctx.response.send_message('You have not saved any messages to forward. Use context menu option `Forward`', ephemeral=True)
+        return
+    await ctx.response.send_message('That\'s how your message will look like:' if not ctx.locale is discord.Locale.russian else 'Так выглядит ваше сообщение:', **await create_send_embeds(ctx, messages[ctx.user.id], anonymous=True, show_ids=True), ephemeral=True)
+
+@tree.command(name=app_commands.locale_str('delete'), description=app_commands.locale_str('Delete the saved message(s)'))
+@app_commands.describe(id=app_commands.locale_str('ID of the message to delete (leave blank to delete all)'))
+@app_commands.user_install()
+async def delete(ctx: discord.Interaction, id: app_commands.Range[int, 1, 10]=None):
+    if ctx.user.id not in messages:
+        if ctx.locale is discord.Locale.russian:
+            await ctx.response.send_message('Вы не сохранили никаких сообщений для перессылки. Используйте контекстное меню `Переслать`', ephemeral=True)
+        else:
+            await ctx.response.send_message('You have not saved any messages to forward. Use context menu option `Forward`', ephemeral=True)
+        return
+    if id is None or (id == 1 and len(messages[ctx.user.id]) == 1):
+        del messages[ctx.user.id]
+        if ctx.locale is discord.Locale.russian:
+            await ctx.response.send_message('Все сообщения были удалены.', ephemeral=True)
+        else:
+            await ctx.response.send_message('All messages were deleted.', ephemeral=True)
+        return
+    if id > len(messages[ctx.user.id]):
+        if ctx.locale is discord.Locale.russian:
+            await ctx.response.send_message('Такого сообщения нет.', ephemeral=True)
+        else:
+            await ctx.response.send_message('There is no such message.', ephemeral=True)
+        return
+    messages[ctx.user.id].pop(id-1)
+    if ctx.locale is discord.Locale.russian:
+        await ctx.response.send_message('Сообщение было удалено.', ephemeral=True)
+    else:
+        await ctx.response.send_message('Message was deleted.', ephemeral=True)
+    
 bot.run(getenv('TOKEN'))

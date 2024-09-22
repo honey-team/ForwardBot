@@ -25,9 +25,17 @@ class MyTranslator(app_commands.Translator):
                 return 'Отправлять ли сообщение анонимно.'
             if message == 'send':
                 return 'отправить'
+            if message == 'preview':
+                return 'предпросмотр'
+            if message == 'Preview the saved message(s)':
+                return 'Предпросмотр сохраненных сообщений'
+            if message == 'delete':
+                return 'удалить'
+            if message == 'Delete the saved message(s)':
+                return 'Удалить сохраненное сообщение(я)'
         return
     
-async def create_send_embeds(ctx: discord.Interaction, messages: list[discord.Message], show_original: bool=True, anonymous: bool=False) -> dict:
+async def create_send_embeds(ctx: discord.Interaction, messages: list[discord.Message], show_original: bool=True, anonymous: bool=False, show_ids: bool=False) -> dict:
     embeds: list[discord.Embed] = []
     for i, message in enumerate(messages):
         tenor = message.embeds and message.embeds[0].url is not None and message.embeds[0].url.startswith('https://tenor.com/view/') # kill tenor
@@ -51,6 +59,8 @@ async def create_send_embeds(ctx: discord.Interaction, messages: list[discord.Me
                 embeds[i].add_field(name='', value=f'[{a.filename}]({a.url})')
         if show_original:
             embeds[i].add_field(name='', value=f'-# [{message.author.name}・<t:{int(message.created_at.timestamp())}:t>]({message.jump_url})', inline=False)
+        if show_ids:
+            embeds[i].set_author(name=f'ID: ' + str(i+1))
     if anonymous:
         return {'embeds': embeds}
     view = discord.ui.View()
