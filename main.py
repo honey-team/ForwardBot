@@ -8,23 +8,30 @@ load_dotenv()
 bot = discord.Client(intents=discord.Intents.default())
 tree = app_commands.CommandTree(bot)
 messages: dict[int, list[discord.Message]] = {}
+initialized = False
 
 @bot.event
 async def on_ready():
-    global SEND, DELETE
+    global SEND, DELETE, initialized
+    if initialized:
+        return
     await tree.set_translator(MyTranslator())
     for command in await tree.sync():
         if command.name == 'send':
             SEND = f'</send:{command.id}>'
         elif command.name == 'delete':
             DELETE = f'</delete:{command.id}>'
+    initialized = True
 
 @tree.context_menu(name=app_commands.locale_str('Forward'))
 @app_commands.user_install()
 async def forward(interaction: discord.Interaction, message: discord.Message):
     await interaction.response.defer(ephemeral=True)
     if interaction.user.id not in messages:
-        messages[interaction.user.id] = [message]
+        if message.author.id == bot.user.id:
+            messages[interaction.user.id] = message.embeds
+        else:
+            messages[interaction.user.id] = [message]
         if interaction.locale is discord.Locale.russian:
             await interaction.followup.send(f'Сообщение сохранено. Теперь используйте команду {SEND}, чтобы отправить его в другой канал.')
         else:
@@ -33,17 +40,30 @@ async def forward(interaction: discord.Interaction, message: discord.Message):
     class AskButton(discord.ui.Button):
         async def callback(self, ctx: discord.Interaction):
             if self.custom_id == 'yes':
+                if message.author.id == bot.user.id:
+                    if len(messages[ctx.user.id]) + len(message.embeds) > 10:
+                        if ctx.locale is discord.Locale.russian:
+                            await ctx.response.send_message(content=f'Вы достигли максимального лимита в 10 сообщений. Пожалуйста, отправьте сохраненные сообщения с помощью команды {SEND} или удалите их с помощью команды {DELETE}.', ephemeral=True)
+                        else:
+                            await ctx.response.send_message(content=f'You have reached the maximum limit of 10 messages. Please send the messages you have saved using the {SEND} command or delete them using the {DELETE} command.', ephemeral=True)
+                        return
+                    messages[ctx.user.id].extend(message.embeds)
+                    if ctx.locale is discord.Locale.russian:
+                        await ctx.response.edit_message(content=f'Сообщения добавлены в список. Теперь используйте команду {SEND}, чтобы отправить все сообщения в другой канал.', view=None)
+                    else:
+                        await ctx.response.edit_message(content=f'Messages added to the list. Now, use the {SEND} command to send all messages to another channel.', view=None)
+                    return
                 if len(messages[ctx.user.id]) < 10:
                     messages[ctx.user.id].append(message)
                     if ctx.locale is discord.Locale.russian:
-                        await ctx.response.edit_message(content=f'Сообщение добавлено в список. Теперь используйте команду {SEND}, чтобы отправить все сообщения в другой канал.',view=None)
+                        await ctx.response.edit_message(content=f'Сообщение добавлено в список. Теперь используйте команду {SEND}, чтобы отправить все сообщения в другой канал.', view=None)
                     else:
-                        await ctx.response.edit_message(content=f'Message added to the list. Now, use the {SEND} command to send all messages to another channel.',view=None)
+                        await ctx.response.edit_message(content=f'Message added to the list. Now, use the {SEND} command to send all messages to another channel.', view=None)
                 else:
                     if ctx.locale is discord.Locale.russian:
-                        await ctx.response.send_message(content=f'Вы достигли максимального лимита в 10 сообщений. Пожалуйста, отправьте сохраненные сообщения с помощью команды {SEND} или удалите их с помощью команды {DELETE}.')
+                        await ctx.response.send_message(content=f'Вы достигли максимального лимита в 10 сообщений. Пожалуйста, отправьте сохраненные сообщения с помощью команды {SEND} или удалите их с помощью команды {DELETE}.', ephemeral=True)
                     else:
-                        await ctx.response.send_message(content=f'You have reached the maximum limit of 10 messages. Please send the messages you have saved using the {SEND} command or delete them using the {DELETE} command.')
+                        await ctx.response.send_message(content=f'You have reached the maximum limit of 10 messages. Please send the messages you have saved using the {SEND} command or delete them using the {DELETE} command.', ephemeral=True)
                 return
             messages[ctx.user.id] = [message]
             if ctx.locale is discord.Locale.russian:
@@ -57,7 +77,7 @@ async def forward(interaction: discord.Interaction, message: discord.Message):
     else:
         view.add_item(AskButton(label='Yes', custom_id='yes', style=discord.ButtonStyle.green))
         view.add_item(AskButton(label='No, delete all other messages', custom_id='no', style=discord.ButtonStyle.red))
-    if len(message.attachments) > 1 and discord.utils.find(lambda a: a.content_type.startswith('image'), message.attachments):
+    if len(message.attachments) > 1 and discord.utils.find(lambda a: a.content_type in image_types, message.attachments):
         if interaction.locale is discord.Locale.russian:
             await interaction.followup.send('У вас уже сохранено сообщение. Хотите добавить его в список?\n-# ПРИМЕЧАНИЕ: Вы можете сохранить до 10 сообщений. Только первое изображение будет видно как изображение.', view=view)
         else:
