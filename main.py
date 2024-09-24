@@ -33,11 +33,11 @@ async def forward(interaction: discord.Interaction, message: discord.Message):
     class ForwardButton(discord.ui.Button):
         async def callback(self, ctx: discord.Interaction):
             await ctx.response.defer()
-            await ctx.followup.send(**await create_send_embeds(ctx, messages[ctx.user.id]))
-            del messages[ctx.user.id]
+            await ctx.followup.send(**await create_send_embeds(ctx))
+            await delete_messages(ctx.user.id)
     forward_view = discord.ui.View()
     forward_view.add_item(ForwardButton(style=discord.ButtonStyle.blurple, label='Переслать сюда' if interaction.locale is discord.Locale.russian else 'Forward here'))
-    if interaction.user.id not in messages:
+    if await (await (await aiosqlite.connect(data_file)).execute('SELECT id FROM Messages WHERE user_id = ?', (message.author.id,))).fetchone() is None:
         await add_message(interaction, message)
         if interaction.locale is discord.Locale.russian:
             await interaction.followup.send(f'Сообщение сохранено. Теперь используйте команду {SEND}, чтобы отправить его в другой канал.', view=forward_view)
@@ -46,22 +46,24 @@ async def forward(interaction: discord.Interaction, message: discord.Message):
         return
     class AskButton(discord.ui.Button):
         async def callback(self, ctx: discord.Interaction):
+            async with aiosqlite.connect(data_file) as conn:
+                messages = (await (await conn.execute('SELECT COUNT(*) FROM Messages WHERE user_id = ?', (ctx.user.id,))).fetchone())[0]
             if self.custom_id == 'yes':
                 if message.author.id == bot.user.id:
-                    if len(messages[ctx.user.id]) + len(message.embeds) > 10:
+                    if messages + len(message.embeds) > 10:
                         if ctx.locale is discord.Locale.russian:
                             await ctx.response.send_message(content=f'Вы достигли максимального лимита в 10 сообщений. Пожалуйста, отправьте сохраненные сообщения с помощью команды {SEND} или удалите их с помощью команды {DELETE}.', ephemeral=True)
                         else:
                             await ctx.response.send_message(content=f'You have reached the maximum limit of 10 messages. Please send the messages you have saved using the {SEND} command or delete them using the {DELETE} command.', ephemeral=True)
                         return
-                    messages[ctx.user.id].extend(message.embeds)
+                    await add_message(ctx, message)
                     if ctx.locale is discord.Locale.russian:
                         await ctx.response.edit_message(content=f'Сообщения добавлены в список. Теперь используйте команду {SEND}, чтобы отправить все сообщения в другой канал.', view=forward_view)
                     else:
                         await ctx.response.edit_message(content=f'Messages added to the list. Now, use the {SEND} command to send all messages to another channel.', view=forward_view)
                     return
-                if len(messages[ctx.user.id]) < 10:
-                    messages[ctx.user.id].append(message)
+                if messages < 10:
+                    await add_message(ctx, message)
                     if ctx.locale is discord.Locale.russian:
                         await ctx.response.edit_message(content=f'Сообщение добавлено в список. Теперь используйте команду {SEND}, чтобы отправить все сообщения в другой канал.', view=forward_view)
                     else:
@@ -72,7 +74,8 @@ async def forward(interaction: discord.Interaction, message: discord.Message):
                     else:
                         await ctx.response.send_message(content=f'You have reached the maximum limit of 10 messages. Please send the messages you have saved using the {SEND} command or delete them using the {DELETE} command.', ephemeral=True)
                 return
-            messages[ctx.user.id] = [message]
+            await delete_messages(ctx.user.id)
+            await add_message(ctx, message)
             if ctx.locale is discord.Locale.russian:
                 await ctx.response.edit_message(content=f'Сообщение сохранено. Теперь используйте команду {SEND}, чтобы отправить его в другой канал.', view=forward_view)
             else:
@@ -110,9 +113,7 @@ async def send(ctx: discord.Interaction, show_original: bool=True, anonymous: bo
     else:
         await ctx.response.defer()
     await ctx.followup.send(**await create_send_embeds(ctx, show_original, anonymous))
-    async with aiosqlite.connect(data_file) as conn:
-        await conn.execute('DELETE FROM Messages WHERE user_id = ?', (ctx.user.id,))
-        await conn.commit()
+    await delete_messages(ctx.user.id)
 
 @tree.command(name=app_commands.locale_str('preview'), description=app_commands.locale_str('Preview the saved message(s)'))
 @app_commands.user_install()
@@ -123,7 +124,7 @@ async def preview(ctx: discord.Interaction):
         else:
             await ctx.response.send_message('You have not saved any messages to forward. Use context menu option `Forward`', ephemeral=True)
         return
-    await ctx.response.send_message('That\'s how your message will look like:' if not ctx.locale is discord.Locale.russian else 'Так выглядит ваше сообщение:', **await create_send_embeds(ctx, messages[ctx.user.id], anonymous=True, show_ids=True), ephemeral=True)
+    await ctx.response.send_message('That\'s how your message will look like:' if not ctx.locale is discord.Locale.russian else 'Так выглядит ваше сообщение:', **await create_send_embeds(ctx, anonymous=True, show_ids=True), ephemeral=True)
 
 @tree.command(name=app_commands.locale_str('delete'), description=app_commands.locale_str('Delete the saved message(s)'))
 @app_commands.describe(id=app_commands.locale_str('ID of the message to delete (leave blank to delete all)'))
@@ -135,20 +136,22 @@ async def delete(ctx: discord.Interaction, id: app_commands.Range[int, 1, 10]=No
         else:
             await ctx.response.send_message('You have not saved any messages to forward. Use context menu option `Forward`', ephemeral=True)
         return
-    if id is None or (id == 1 and len(messages[ctx.user.id]) == 1):
-        del messages[ctx.user.id]
+    async with aiosqlite.connect(data_file) as conn:
+        messages = await (await conn.execute('SELECT id FROM messages WHERE user_id = ?', (ctx.user.id,))).fetchall()
+    if id is None or (id == 1 and len(messages) == 1):
+        await delete_messages(ctx.user.id)
         if ctx.locale is discord.Locale.russian:
             await ctx.response.send_message('Все сообщения были удалены.', ephemeral=True)
         else:
             await ctx.response.send_message('All messages were deleted.', ephemeral=True)
         return
-    if id > len(messages[ctx.user.id]):
+    if id > len(messages):
         if ctx.locale is discord.Locale.russian:
             await ctx.response.send_message('Такого сообщения нет.', ephemeral=True)
         else:
             await ctx.response.send_message('There is no such message.', ephemeral=True)
         return
-    messages[ctx.user.id].pop(id-1)
+    await delete_messages(ctx.user.id, id)
     if ctx.locale is discord.Locale.russian:
         await ctx.response.send_message('Сообщение было удалено.', ephemeral=True)
     else:

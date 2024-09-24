@@ -41,8 +41,7 @@ class MyTranslator(app_commands.Translator):
 async def create_send_embeds(ctx: discord.Interaction, show_original: bool=True, anonymous: bool=False, show_ids: bool=False) -> dict:
     embeds: list[discord.Embed] = []
     conn = await aiosqlite.connect(data_file)
-    cursor = await conn.cursor()
-    await cursor.execute('SELECT * FROM Messages WHERE user_id = ?', (ctx.user.id,))
+    cursor = await conn.execute('SELECT * FROM Messages WHERE user_id = ? ORDER BY id', (ctx.user.id,))
     messages = await cursor.fetchall()
     for i, message in enumerate(messages):
         await cursor.execute('SELECT filename, url, image, tenor FROM Attachments WHERE message_id = ? AND user_id = ?', (message[0], message[1]))
@@ -51,7 +50,7 @@ async def create_send_embeds(ctx: discord.Interaction, show_original: bool=True,
         if i == 0:
             embeds.append(discord.Embed(title=f'{getenv("EMOJI") or ""} *Forwarded*' if not ctx.locale is discord.Locale.russian else f'{getenv("EMOJI") or ""} *Переслано*', description=message[3] if image and image[3] == 0 else None))
         else:
-            embeds.append(discord.Embed(description=message[3] if image and image[3] == 0 else None))
+            embeds.append(discord.Embed(description=message[3] if image and image[3] != 1 else None))
         if image is not None:
             embeds[i].set_image(url=image[1])
         for a in attachments:
@@ -96,7 +95,11 @@ async def add_message(ctx: discord.Interaction, message: discord.Message):
     conn = await aiosqlite.connect('messages.db')
     cursor = await conn.cursor()
     await cursor.execute('SELECT id FROM Messages WHERE user_id = ? ORDER BY id DESC', (ctx.user.id,))
-    id = (await cursor.fetchone())[0] + 1
+    id = await cursor.fetchone()
+    if id is None:
+        id = 1
+    else:
+        id = id[0] + 1
     if message.author.id == ctx.client.user.id:
         for embed in message.embeds:
             await cursor.execute('INSERT INTO Messages VALUES (?, ?, ?, ?)', (id, ctx.user.id, embed.fields[-1].value if embed.fields and not embed.fields[-1].inline else None, embed.description))
@@ -129,3 +132,15 @@ async def add_message(ctx: discord.Interaction, message: discord.Message):
             await cursor.execute('INSERT INTO Attachments VALUES (?, ?, ?, ?, 0, 0)', (id, ctx.user.id, attachment.filename, attachment.url))
     await conn.commit()
     await conn.close()
+
+async def delete_messages(user_id: int, message_id: int=None):
+    async with aiosqlite.connect(data_file) as conn:
+        if message_id is None:
+            await conn.execute('DELETE FROM Messages WHERE user_id = ?', (user_id,))
+            await conn.execute('DELETE FROM Attachments WHERE user_id = ?', (user_id,))
+            await conn.commit()
+            return
+        true_id = (await (await conn.execute('SELECT id FROM Messages WHERE user_id = ?', (user_id,))).fetchall())[message_id - 1][0]
+        await conn.execute('DELETE FROM Messages WHERE id = ? AND user_id = ?', (true_id, user_id))
+        await conn.execute('DELETE FROM Attachments WHERE message_id = ? AND user_id = ?', (true_id, user_id))
+        await conn.commit()
