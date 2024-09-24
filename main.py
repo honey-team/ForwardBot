@@ -1,8 +1,9 @@
 import discord
 from discord import app_commands
 from dotenv import load_dotenv
-from os import getenv
+from os import getenv, path
 from utils import *
+import aiosqlite
 load_dotenv()
 
 bot = discord.Client(intents=discord.Intents.default())
@@ -15,6 +16,8 @@ async def on_ready():
     global SEND, DELETE, initialized
     if initialized:
         return
+    if not path.isfile('messages.db'):
+        await initiate_db('messages.db')
     await tree.set_translator(MyTranslator())
     for command in await tree.sync():
         if command.name == 'send':

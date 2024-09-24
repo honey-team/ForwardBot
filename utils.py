@@ -4,6 +4,7 @@ from os import getenv
 import aiohttp
 from bs4 import BeautifulSoup
 from copy import deepcopy
+import aiosqlite
 
 image_types = {'image/jpeg', 'image/png', 'image/webp'}
 
@@ -48,7 +49,7 @@ async def create_send_embeds(ctx: discord.Interaction, messages: list[discord.Me
             if not show_original and not embeds[i].fields[-1].inline:
                 embeds[i].remove_field(-1)
             if show_ids:
-                embeds[i].set_author(name=f'ID: ' + str(i+1))
+                embeds[i].set_author(name='ID: ' + str(i+1))
             continue
         tenor = message.embeds and message.embeds[0].url is not None and message.embeds[0].url.startswith('https://tenor.com/view/') # kill tenor
         image = discord.utils.find(lambda a: a.content_type in image_types, message.attachments)
@@ -72,9 +73,60 @@ async def create_send_embeds(ctx: discord.Interaction, messages: list[discord.Me
         if show_original:
             embeds[i].add_field(name='', value=f'-# [{message.author.name}・<t:{int(message.created_at.timestamp())}:t>]({message.jump_url})', inline=False)
         if show_ids:
-            embeds[i].set_author(name=f'ID: ' + str(i+1))
+            embeds[i].set_author(name='ID: ' + str(i+1))
     if anonymous:
         return {'embeds': embeds}
     view = discord.ui.View()
     view.add_item(discord.ui.Button(label=f'Forwarded by {ctx.user.name}' if not ctx.locale is discord.Locale.russian else f'Переслано {ctx.user.name}', disabled=True))
     return {'embeds': embeds, 'view': view}
+
+# database shit
+
+async def initiate_db(filename: str):
+    conn = await aiosqlite.connect(filename)
+    cursor = await conn.cursor()
+    await cursor.executescript('''
+                               CREATE TABLE IF NOT EXISTS Messages (
+                               id INTEGER,
+                               message_id INTEGER,
+                               user_id INTEGER,
+                               jump_url TEXT,
+                               message TEXT,
+                               timestamp INTEGER
+                               );
+                               CREATE TABLE IF NOT EXISTS Attachments (
+                               message_id INTEGER,
+                               url TEXT,
+                               image INTEGER
+                               )''')
+    await conn.commit()
+    await conn.close()
+
+async def add_message(ctx: discord.Interaction, message: discord.Message):
+    conn = await aiosqlite.connect('messages.db')
+    cursor = await conn.cursor()
+    await cursor.execute('SELECT id FROM Messages WHERE user_id = ? ORDER BY id DESC', (ctx.user.id,))
+    id = (await cursor.fetchone())[0] + 1
+    if message.author.id == ctx.client.user.id:
+        pass
+    else:
+        await cursor.execute('INSERT INTO Messages VALUES (?, ?, ?, ?, ?, ?)', (id, message.id, ctx.user.id, message.jump_url, message.content, int(message.created_at.timestamp())))
+        tenor = message.embeds and message.embeds[0].url is not None and message.embeds[0].url.startswith('https://tenor.com/view/')
+        image = discord.utils.find(lambda a: a.content_type in image_types, message.attachments)
+        if image is None:
+            if tenor:
+                async with aiohttp.ClientSession(headers={'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'}) as session:
+                    async with session.get(message.embeds[0].url) as r:
+                        data = await r.text()
+                image = f"https://c.tenor.com/{BeautifulSoup(data, 'html.parser').find('meta', itemprop='contentUrl')['content'].split('/')[4]}/tenor.gif"
+            elif message.embeds and message.embeds[0].type == 'image':
+                image = message.embeds[0].url
+        else:
+            image = image.url
+        await cursor.execute('INSERT INTO Attachments VALUES (?, ?, ?)', (message.id, image, 1))
+        for attachment in message.attachments:
+            if attachment.url == image:
+                continue
+            await cursor.execute('INSERT INTO Attachments VALUES (?, ?, ?)', (message.id, attachment.url, 0))
+    await conn.commit()
+    await conn.close()
