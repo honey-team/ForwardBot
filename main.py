@@ -16,8 +16,8 @@ async def on_ready():
     global SEND, DELETE, initialized
     if initialized:
         return
-    if not path.isfile('messages.db'):
-        await initiate_db('messages.db')
+    if not path.isfile(data_file):
+        await initiate_db(data_file)
     await tree.set_translator(MyTranslator())
     for command in await tree.sync():
         if command.name == 'send':
@@ -31,10 +31,7 @@ async def on_ready():
 async def forward(interaction: discord.Interaction, message: discord.Message):
     await interaction.response.defer(ephemeral=True)
     if interaction.user.id not in messages:
-        if message.author.id == bot.user.id:
-            messages[interaction.user.id] = message.embeds
-        else:
-            messages[interaction.user.id] = [message]
+        await add_message(interaction, message)
         if interaction.locale is discord.Locale.russian:
             await interaction.followup.send(f'Сообщение сохранено. Теперь используйте команду {SEND}, чтобы отправить его в другой канал.')
         else:
@@ -105,8 +102,10 @@ async def send(ctx: discord.Interaction, show_original: bool=True, anonymous: bo
         await ctx.response.send_message(':shushing_face:', ephemeral=True)
     else:
         await ctx.response.defer()
-    await ctx.followup.send(**await create_send_embeds(ctx, messages[ctx.user.id], show_original, anonymous))
-    del messages[ctx.user.id]
+    await ctx.followup.send(**await create_send_embeds(ctx, show_original, anonymous))
+    async with aiosqlite.connect(data_file) as conn:
+        await conn.execute('DELETE FROM Messages WHERE user_id = ?', (ctx.user.id,))
+        await conn.commit()
 
 @tree.command(name=app_commands.locale_str('preview'), description=app_commands.locale_str('Preview the saved message(s)'))
 @app_commands.user_install()
