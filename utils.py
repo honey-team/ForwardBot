@@ -3,6 +3,7 @@ from discord import app_commands
 from os import getenv
 import aiohttp
 from bs4 import BeautifulSoup
+from copy import deepcopy
 
 image_types = {'image/jpeg', 'image/png', 'image/webp'}
 
@@ -39,13 +40,15 @@ async def create_send_embeds(ctx: discord.Interaction, messages: list[discord.Me
     embeds: list[discord.Embed] = []
     for i, message in enumerate(messages):
         if type(message) is discord.Embed:
+            embeds.append(deepcopy(message))
             if i == 0:
-                message.title = f'{getenv("EMOJI") or ""} *Forwarded*' if not ctx.locale is discord.Locale.russian else f'{getenv("EMOJI") or ""} *Переслано*'
+                embeds[i].title = f'{getenv("EMOJI") or ""} *Forwarded*' if not ctx.locale is discord.Locale.russian else f'{getenv("EMOJI") or ""} *Переслано*'
             else:
-                message.title = None
-            if not show_original and not message.fields[-1].inline:
-                message.remove_field(-1)
-            embeds.append(message)
+                embeds[i].title = None
+            if not show_original and not embeds[i].fields[-1].inline:
+                embeds[i].remove_field(-1)
+            if show_ids:
+                embeds[i].set_author(name=f'ID: ' + str(i+1))
             continue
         tenor = message.embeds and message.embeds[0].url is not None and message.embeds[0].url.startswith('https://tenor.com/view/') # kill tenor
         image = discord.utils.find(lambda a: a.content_type in image_types, message.attachments)
