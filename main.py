@@ -27,22 +27,15 @@ async def on_ready():
 @app_commands.user_install()
 async def forward(interaction: discord.Interaction, message: discord.Message):
     await interaction.response.defer(ephemeral=True)
-    class ForwardButton(discord.ui.Button):
-        async def callback(self, ctx: discord.Interaction):
-            await ctx.response.defer()
-            await ctx.followup.send(**await create_send_embeds(ctx, messages[ctx.user.id]))
-            del messages[ctx.user.id]
-    forward_view = discord.ui.View()
-    forward_view.add_item(ForwardButton(style=discord.ButtonStyle.blurple, label='Переслать сюда' if interaction.locale is discord.Locale.russian else 'Forward here'))
     if interaction.user.id not in messages:
         if message.author.id == bot.user.id:
             messages[interaction.user.id] = message.embeds
         else:
             messages[interaction.user.id] = [message]
         if interaction.locale is discord.Locale.russian:
-            await interaction.followup.send(f'Сообщение сохранено. Теперь используйте команду {SEND}, чтобы отправить его в другой канал.', view=forward_view)
+            await interaction.followup.send(f'Сообщение сохранено. Теперь используйте команду {SEND}, чтобы отправить его в другой канал.')
         else:
-            await interaction.followup.send(f'Message saved. Now, use the {SEND} command to send it to another channel.', view=forward_view)
+            await interaction.followup.send(f'Message saved. Now, use the {SEND} command to send it to another channel.')
         return
     class AskButton(discord.ui.Button):
         async def callback(self, ctx: discord.Interaction):
@@ -56,16 +49,16 @@ async def forward(interaction: discord.Interaction, message: discord.Message):
                         return
                     messages[ctx.user.id].extend(message.embeds)
                     if ctx.locale is discord.Locale.russian:
-                        await ctx.response.edit_message(content=f'Сообщения добавлены в список. Теперь используйте команду {SEND}, чтобы отправить все сообщения в другой канал.', view=forward_view)
+                        await ctx.response.edit_message(content=f'Сообщения добавлены в список. Теперь используйте команду {SEND}, чтобы отправить все сообщения в другой канал.', view=None)
                     else:
-                        await ctx.response.edit_message(content=f'Messages added to the list. Now, use the {SEND} command to send all messages to another channel.', view=forward_view)
+                        await ctx.response.edit_message(content=f'Messages added to the list. Now, use the {SEND} command to send all messages to another channel.', view=None)
                     return
                 if len(messages[ctx.user.id]) < 10:
                     messages[ctx.user.id].append(message)
                     if ctx.locale is discord.Locale.russian:
-                        await ctx.response.edit_message(content=f'Сообщение добавлено в список. Теперь используйте команду {SEND}, чтобы отправить все сообщения в другой канал.', view=forward_view)
+                        await ctx.response.edit_message(content=f'Сообщение добавлено в список. Теперь используйте команду {SEND}, чтобы отправить все сообщения в другой канал.', view=None)
                     else:
-                        await ctx.response.edit_message(content=f'Message added to the list. Now, use the {SEND} command to send all messages to another channel.', view=forward_view)
+                        await ctx.response.edit_message(content=f'Message added to the list. Now, use the {SEND} command to send all messages to another channel.', view=None)
                 else:
                     if ctx.locale is discord.Locale.russian:
                         await ctx.response.send_message(content=f'Вы достигли максимального лимита в 10 сообщений. Пожалуйста, отправьте сохраненные сообщения с помощью команды {SEND} или удалите их с помощью команды {DELETE}.', ephemeral=True)
@@ -74,9 +67,9 @@ async def forward(interaction: discord.Interaction, message: discord.Message):
                 return
             messages[ctx.user.id] = [message]
             if ctx.locale is discord.Locale.russian:
-                await ctx.response.edit_message(content=f'Сообщение сохранено. Теперь используйте команду {SEND}, чтобы отправить его в другой канал.', view=forward_view)
+                await ctx.response.edit_message(content=f'Сообщение сохранено. Теперь используйте команду {SEND}, чтобы отправить его в другой канал.', view=None)
             else:
-                await ctx.response.edit_message(content=f'Message saved. Now, use the {SEND} command to send it to another channel.', view=forward_view)
+                await ctx.response.edit_message(content=f'Message saved. Now, use the {SEND} command to send it to another channel.', view=None)
     view = discord.ui.View()
     if interaction.locale is discord.Locale.russian:
         view.add_item(AskButton(label='Да', custom_id='yes', style=discord.ButtonStyle.green))
@@ -94,6 +87,12 @@ async def forward(interaction: discord.Interaction, message: discord.Message):
         await interaction.followup.send('У вас уже сохранено сообщение. Хотите добавить его в список?\n-# ПРИМЕЧАНИЕ: Вы можете сохранить до 10 сообщений.', view=view)
     else:
         await interaction.followup.send('You have already saved a message. Would you like to add it to the list?\n-# NOTE: You can save up to 10 messages.', view=view)
+
+@tree.context_menu(name=app_commands.locale_str('Instant forward'))
+@app_commands.user_install()
+async def instant(ctx: discord.Interaction, message: discord.Message):
+    await ctx.response.defer()
+    await ctx.followup.send(**await create_send_embeds(ctx, [message]))
 
 @tree.command(name=app_commands.locale_str('send'), description=app_commands.locale_str('Send the saved message(s) to another channel'))
 @app_commands.describe(show_original=app_commands.locale_str('Whether to show the original message link. Might be needed to set to off on some servers.'), anonymous=app_commands.locale_str('Whether to send the message anonymously.'))

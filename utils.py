@@ -18,6 +18,8 @@ class MyTranslator(app_commands.Translator):
         if locale is discord.Locale.russian:
             if message == 'Forward':
                 return 'Переслать'
+            if message == 'Instant forward':
+                return 'Переслать немедленно'
             if message == 'Send the saved message(s) to another channel':
                 return 'Отправить сохраненное сообщение(я) в другой канал'
             if message == 'Whether to show the original message link. Might be needed to set to off on some servers.':
