@@ -48,14 +48,14 @@ async def create_send_embeds(ctx: discord.Interaction, show_original: bool=True,
         attachments = await cursor.fetchall()
         image = discord.utils.find(lambda a: a[2] == 1, attachments)
         if i == 0:
-            embeds.append(discord.Embed(title=f'{getenv("EMOJI") or ""} *Forwarded*' if not ctx.locale is discord.Locale.russian else f'{getenv("EMOJI") or ""} *Переслано*', description=message[3] if image and image[3] == 0 else None))
+            embeds.append(discord.Embed(title=f'{getenv("EMOJI") or ""} *Forwarded*' if not ctx.locale is discord.Locale.russian else f'{getenv("EMOJI") or ""} *Переслано*', description=message[3] if not image or image[3] != 1 else None))
         else:
             embeds.append(discord.Embed(description=message[3] if image and image[3] != 1 else None))
         if image is not None:
             embeds[i].set_image(url=image[1])
         for a in attachments:
             if a[2] != 1:
-                embeds[i].add_field(name='', value=f'[{a[0]}]({a[1]})')
+                embeds[i].add_field(name='', value=f'[{a[0]}]({a[1]})' if a[0] else a[1])
         if show_original:
             embeds[i].add_field(name='', value=message[2], inline=False)
         if show_ids:
@@ -87,11 +87,23 @@ async def initiate_db(filename: str):
                                url TEXT,
                                image INTEGER,
                                tenor INTEGER
+                               );
+                               CREATE TABLE IF NOT EXISTS PotentialMessages (
+                               user_id INTEGER,
+                               footer TEXT,
+                               message TEXT
+                               );
+                               CREATE TABLE IF NOT EXISTS PotentialAttachments (
+                               user_id INTEGER,
+                               filename TEXT,
+                               url TEXT,
+                               image INTEGER,
+                               tenor INTEGER
                                )''')
     await conn.commit()
     await conn.close()
 
-async def add_message(ctx: discord.Interaction, message: discord.Message):
+async def add_message(ctx: discord.Interaction, message: discord.Message, confirmed: bool=True):
     conn = await aiosqlite.connect('messages.db')
     cursor = await conn.cursor()
     await cursor.execute('SELECT id FROM Messages WHERE user_id = ? ORDER BY id DESC', (ctx.user.id,))
@@ -108,7 +120,7 @@ async def add_message(ctx: discord.Interaction, message: discord.Message):
             for a in embed.fields:
                 if not a.inline:
                     continue
-                await cursor.execute('INSERT INTO Attachments VALUES (?, ?, ?, ?, 0, 0)', (id, ctx.user.id, a.name, a.value))
+                await cursor.execute('INSERT INTO Attachments VALUES (?, ?, ?, ?, 0, 0)', (id, ctx.user.id, None, a.value))
             id += 1
     else:
         await cursor.execute('INSERT INTO Messages VALUES (?, ?, ?, ?)', (id, ctx.user.id, f'-# [{message.author.name}・<t:{int(message.created_at.timestamp())}:t>]({message.jump_url})', message.content))
@@ -144,3 +156,14 @@ async def delete_messages(user_id: int, message_id: int=None):
         await conn.execute('DELETE FROM Messages WHERE id = ? AND user_id = ?', (true_id, user_id))
         await conn.execute('DELETE FROM Attachments WHERE message_id = ? AND user_id = ?', (true_id, user_id))
         await conn.commit()
+
+async def message_check(id: int, confirmed: bool=True) -> bool:
+    conn = await aiosqlite.connect(data_file)
+    if confirmed:
+        cursor = await conn.execute('SELECT id FROM Messages WHERE user_id = ?', (id,))
+    else:
+        cursor = await conn.execute('SELECT * FROM Messages WHERE user_id = ?', (id,))
+    message = await cursor.fetchone()
+    await cursor.close()
+    await conn.close()
+    return message is not None

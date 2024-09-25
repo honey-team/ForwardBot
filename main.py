@@ -8,7 +8,6 @@ load_dotenv()
 
 bot = discord.Client(intents=discord.Intents.default())
 tree = app_commands.CommandTree(bot)
-messages: dict[int, list[discord.Message]] = {}
 initialized = False
 
 @bot.event
@@ -32,7 +31,11 @@ async def forward(interaction: discord.Interaction, message: discord.Message):
     await interaction.response.defer(ephemeral=True)
     class ForwardButton(discord.ui.Button):
         async def callback(self, ctx: discord.Interaction):
-            await ctx.response.defer()
+            view = discord.ui.View()
+            view.add_item(discord.ui.Button(style=discord.ButtonStyle.blurple, label='Переслано' if interaction.locale is discord.Locale.russian else 'Forwarded', disabled=True))
+            await ctx.response.edit_message(view=view)
+            if not await message_check(ctx.user.id):
+                await ctx.followup.send('Вы уже переслали или удалили сообщение.' if ctx.locale is discord.Locale.russian else 'You have already forwarded or deleted a message.', ephemeral=True)
             await ctx.followup.send(**await create_send_embeds(ctx))
             await delete_messages(ctx.user.id)
     forward_view = discord.ui.View()
@@ -102,7 +105,7 @@ async def forward(interaction: discord.Interaction, message: discord.Message):
 @app_commands.describe(show_original=app_commands.locale_str('Whether to show the original message link. Might be needed to set to off on some servers.'), anonymous=app_commands.locale_str('Whether to send the message anonymously.'))
 @app_commands.user_install()
 async def send(ctx: discord.Interaction, show_original: bool=True, anonymous: bool=False):
-    if ctx.user.id not in messages:
+    if await message_check(ctx.user.id):
         if ctx.locale is discord.Locale.russian:
             await ctx.response.send_message('Вы не сохранили никаких сообщений для отправки. Используйте контекстное меню `Переслать`', ephemeral=True)
         else:
@@ -118,7 +121,7 @@ async def send(ctx: discord.Interaction, show_original: bool=True, anonymous: bo
 @tree.command(name=app_commands.locale_str('preview'), description=app_commands.locale_str('Preview the saved message(s)'))
 @app_commands.user_install()
 async def preview(ctx: discord.Interaction):
-    if ctx.user.id not in messages:
+    if await message_check(ctx.user.id):
         if ctx.locale is discord.Locale.russian:
             await ctx.response.send_message('Вы не сохранили никаких сообщений для перессылки. Используйте контекстное меню `Переслать`', ephemeral=True)
         else:
@@ -130,14 +133,14 @@ async def preview(ctx: discord.Interaction):
 @app_commands.describe(id=app_commands.locale_str('ID of the message to delete (leave blank to delete all)'))
 @app_commands.user_install()
 async def delete(ctx: discord.Interaction, id: app_commands.Range[int, 1, 10]=None):
-    if ctx.user.id not in messages:
+    async with aiosqlite.connect(data_file) as conn:
+        messages = await (await conn.execute('SELECT id FROM messages WHERE user_id = ? ORDER BY id', (ctx.user.id,))).fetchall()
+    if not messages:
         if ctx.locale is discord.Locale.russian:
             await ctx.response.send_message('Вы не сохранили никаких сообщений для перессылки. Используйте контекстное меню `Переслать`', ephemeral=True)
         else:
             await ctx.response.send_message('You have not saved any messages to forward. Use context menu option `Forward`', ephemeral=True)
         return
-    async with aiosqlite.connect(data_file) as conn:
-        messages = await (await conn.execute('SELECT id FROM messages WHERE user_id = ?', (ctx.user.id,))).fetchall()
     if id is None or (id == 1 and len(messages) == 1):
         await delete_messages(ctx.user.id)
         if ctx.locale is discord.Locale.russian:
