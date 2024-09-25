@@ -88,6 +88,12 @@ async def instant(ctx: discord.Interaction, message: discord.Message):
         embeds[0].add_field(name='', value=f'-# [{message.author.name}・<t:{int(message.created_at.timestamp())}:t>]({message.jump_url})', inline=False)
     await ctx.followup.send(embeds=embeds)
 
+@tree.context_menu(name=app_commands.locale_str('Instant forward'))
+@app_commands.user_install()
+async def instant(ctx: discord.Interaction, message: discord.Message):
+    await ctx.response.defer()
+    await ctx.followup.send(**await create_send_embeds(ctx, [message]))
+
 @tree.command(name=app_commands.locale_str('send'), description=app_commands.locale_str('Send the saved message(s) to another channel'))
 @app_commands.describe(show_original=app_commands.locale_str('Whether to show the original message link. Might be needed to set to off on some servers.'), anonymous=app_commands.locale_str('Whether to send the message anonymously.'))
 @app_commands.user_install()
