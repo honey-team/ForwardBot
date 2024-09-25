@@ -20,6 +20,8 @@ class MyTranslator(app_commands.Translator):
         if locale is discord.Locale.russian:
             if message == 'Forward':
                 return 'Переслать'
+            if message == 'Instant forward':
+                return 'Переслать немедленно'
             if message == 'Send the saved message(s) to another channel':
                 return 'Отправить сохраненное сообщение(я) в другой канал'
             if message == 'Whether to show the original message link. Might be needed to set to off on some servers.':
@@ -38,7 +40,7 @@ class MyTranslator(app_commands.Translator):
                 return 'Удалить сохраненное сообщение(я)'
         return
     
-async def create_send_embeds(ctx: discord.Interaction, show_original: bool=True, anonymous: bool=False, show_ids: bool=False) -> dict:
+async def create_send_embeds(ctx: discord.Interaction, show_original: bool=True, show_ids: bool=False) -> list[discord.Embed]:
     embeds: list[discord.Embed] = []
     conn = await aiosqlite.connect(data_file)
     cursor = await conn.execute('SELECT * FROM Messages WHERE user_id = ? ORDER BY id', (ctx.user.id,))
@@ -50,7 +52,7 @@ async def create_send_embeds(ctx: discord.Interaction, show_original: bool=True,
         if i == 0:
             embeds.append(discord.Embed(title=f'{getenv("EMOJI") or ""} *Forwarded*' if not ctx.locale is discord.Locale.russian else f'{getenv("EMOJI") or ""} *Переслано*', description=message[3] if not image or image[3] != 1 else None))
         else:
-            embeds.append(discord.Embed(description=message[3] if image and image[3] != 1 else None))
+            embeds.append(discord.Embed(description=message[3] if not image or image[3] != 1 else None))
         if image is not None:
             embeds[i].set_image(url=image[1])
         for a in attachments:
@@ -62,11 +64,7 @@ async def create_send_embeds(ctx: discord.Interaction, show_original: bool=True,
             embeds[i].set_author(name='ID: ' + str(i+1))
     await cursor.close()
     await conn.close()
-    if anonymous:
-        return {'embeds': embeds}
-    view = discord.ui.View()
-    view.add_item(discord.ui.Button(label=f'Forwarded by {ctx.user.name}' if not ctx.locale is discord.Locale.russian else f'Переслано {ctx.user.name}', disabled=True))
-    return {'embeds': embeds, 'view': view}
+    return embeds
 
 # database shit
 
@@ -82,18 +80,6 @@ async def initiate_db(filename: str):
                                );
                                CREATE TABLE IF NOT EXISTS Attachments (
                                message_id INTEGER,
-                               user_id INTEGER,
-                               filename TEXT,
-                               url TEXT,
-                               image INTEGER,
-                               tenor INTEGER
-                               );
-                               CREATE TABLE IF NOT EXISTS PotentialMessages (
-                               user_id INTEGER,
-                               footer TEXT,
-                               message TEXT
-                               );
-                               CREATE TABLE IF NOT EXISTS PotentialAttachments (
                                user_id INTEGER,
                                filename TEXT,
                                url TEXT,
@@ -123,7 +109,7 @@ async def add_message(ctx: discord.Interaction, message: discord.Message, confir
                 await cursor.execute('INSERT INTO Attachments VALUES (?, ?, ?, ?, 0, 0)', (id, ctx.user.id, None, a.value))
             id += 1
     else:
-        await cursor.execute('INSERT INTO Messages VALUES (?, ?, ?, ?)', (id, ctx.user.id, f'-# [{message.author.name}・<t:{int(message.created_at.timestamp())}:t>]({message.jump_url})', message.content))
+        await cursor.execute('INSERT INTO Messages VALUES (?, ?, ?, ?)', (id, ctx.user.id, f'-# [{message.author.name} **·** <t:{int(message.created_at.timestamp())}:t>]({message.jump_url})', message.content))
         tenor = message.embeds and message.embeds[0].url is not None and message.embeds[0].url.startswith('https://tenor.com/view/')
         image = discord.utils.find(lambda a: a.content_type in image_types, message.attachments)
         if image is None:
