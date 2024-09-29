@@ -26,7 +26,8 @@ async def on_ready():
     initialized = True
 
 @tree.context_menu(name=app_commands.locale_str('Forward'))
-@app_commands.user_install()
+@app_commands.allowed_installs(True, True)
+@app_commands.allowed_contexts(True, True, True)
 async def forward(ctx: discord.Interaction, message: discord.Message):
     await ctx.response.defer(ephemeral=True)
     async with aiosqlite.connect(data_file) as conn:
@@ -57,7 +58,8 @@ async def forward(ctx: discord.Interaction, message: discord.Message):
             await ctx.followup.send(f'You have reached the maximum limit of 10 messages. Please send the messages you have saved using the {SEND} command or delete them using the {DELETE} command.')
 
 @tree.context_menu(name=app_commands.locale_str('Instant forward'))
-@app_commands.user_install()
+@app_commands.allowed_installs(True, True)
+@app_commands.allowed_contexts(True, True, True)
 async def instant(ctx: discord.Interaction, message: discord.Message):
     await ctx.response.defer()
     embeds: list[discord.Embed] = []
@@ -90,7 +92,8 @@ async def instant(ctx: discord.Interaction, message: discord.Message):
 
 @tree.command(name=app_commands.locale_str('send'), description=app_commands.locale_str('Send the saved message(s) to another channel'))
 @app_commands.describe(show_original=app_commands.locale_str('Whether to show the original message link. Might be needed to set to off on some servers.'), anonymous=app_commands.locale_str('Whether to send the message anonymously.'))
-@app_commands.user_install()
+@app_commands.allowed_installs(True, True)
+@app_commands.allowed_contexts(True, True, True)
 async def send(ctx: discord.Interaction, show_original: bool=True, anonymous: bool=False):
     if not await message_check(ctx.user.id):
         if ctx.locale is discord.Locale.russian:
@@ -106,7 +109,8 @@ async def send(ctx: discord.Interaction, show_original: bool=True, anonymous: bo
     await delete_messages(ctx.user.id)
 
 @tree.command(name=app_commands.locale_str('preview'), description=app_commands.locale_str('Preview the saved message(s)'))
-@app_commands.user_install()
+@app_commands.allowed_installs(True, True)
+@app_commands.allowed_contexts(True, True, True)
 async def preview(ctx: discord.Interaction):
     if not await message_check(ctx.user.id):
         if ctx.locale is discord.Locale.russian:
@@ -118,7 +122,8 @@ async def preview(ctx: discord.Interaction):
 
 @tree.command(name=app_commands.locale_str('delete'), description=app_commands.locale_str('Delete the saved message(s)'))
 @app_commands.describe(id=app_commands.locale_str('ID of the message to delete (leave blank to delete all)'))
-@app_commands.user_install()
+@app_commands.allowed_installs(True, True)
+@app_commands.allowed_contexts(True, True, True)
 async def delete(ctx: discord.Interaction, id: app_commands.Range[int, 1, 10]=None):
     async with aiosqlite.connect(data_file) as conn:
         messages = await (await conn.execute('SELECT id FROM messages WHERE user_id = ? ORDER BY id', (ctx.user.id,))).fetchall()
