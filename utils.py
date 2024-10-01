@@ -18,26 +18,27 @@ class MyTranslator(app_commands.Translator):
     ) -> str | None:
         message = str(string)
         if locale is discord.Locale.russian:
-            if message == 'Forward':
-                return 'Переслать'
-            if message == 'Instant forward':
-                return 'Переслать немедленно'
-            if message == 'Send the saved message(s) to another channel':
-                return 'Отправить сохраненное сообщение(я) в другой канал'
-            if message == 'Whether to show the original message link. Might be needed to set to off on some servers.':
-                return 'Показывать ли ссылку на оригинальное сообщение. Может понадобиться выключить на некоторых серверах.'
-            if message == 'Whether to send the message anonymously.':
-                return 'Отправлять ли сообщение анонимно.'
-            if message == 'send':
-                return 'отправить'
-            if message == 'preview':
-                return 'предпросмотр'
-            if message == 'Preview the saved message(s)':
-                return 'Предпросмотр сохраненных сообщений'
-            if message == 'delete':
-                return 'удалить'
-            if message == 'Delete the saved message(s)':
-                return 'Удалить сохраненное сообщение(я)'
+            match message:
+                case 'Forward':
+                    return 'Переслать'
+                case 'Instant forward':
+                    return 'Переслать немедленно'
+                case 'Send the saved message(s) to another channel':
+                    return 'Отправить сохраненное сообщение(я) в другой канал'
+                case 'Whether to show the original message link. Might be needed to set to off on some servers.':
+                    return 'Показывать ли ссылку на оригинальное сообщение. Может понадобиться выключить на некоторых серверах.'
+                case 'Whether to send the message anonymously.':
+                    return 'Отправлять ли сообщение анонимно.'
+                case 'send':
+                    return 'отправить'
+                case 'preview':
+                    return 'предпросмотр'
+                case 'Preview the saved message(s)':
+                    return 'Предпросмотр сохраненных сообщений'
+                case 'delete':
+                    return 'удалить'
+                case 'Delete the saved message(s)':
+                    return 'Удалить сохраненное сообщение(я)'
         return
     
 async def create_send_embeds(ctx: discord.Interaction, show_original: bool=True, show_ids: bool=False) -> list[discord.Embed]:

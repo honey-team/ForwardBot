@@ -63,7 +63,7 @@ async def forward(ctx: discord.Interaction, message: discord.Message):
 async def instant(ctx: discord.Interaction, message: discord.Message):
     await ctx.response.defer()
     embeds: list[discord.Embed] = []
-    if ctx.user.id == bot.user.id:
+    if message.author.id == bot.user.id:
         for i, m in enumerate(message.embeds):
             embeds.append(deepcopy(m))
             if i == 0:
